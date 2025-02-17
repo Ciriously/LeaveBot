@@ -13,6 +13,7 @@ function doPost(e) {
     const commandHandlers = {
       "/leave_request": () => processLeaveRequest(e.postData.contents),
       "/leave_status": () => getLeaveStatusV2(text),
+      "/leave_cancel": () => cancelLeaveRequest(text),
     };
 
     let response = commandHandlers[command]
@@ -20,10 +21,11 @@ function doPost(e) {
       : { error: `❌ ERROR: Invalid command received - ${command}` };
 
     if (!commandHandlers[command]) {
+      // Log Slack error in case of an invalid command
       logAndSendSlackError(response.error);
     }
 
-    // 🛠️ Convert Object to String (Fix for [object Object] issue)
+    // 🛠️ Convert Object to String if it's an object (Fix for [object Object] issue)
     let responseMessage =
       typeof response === "object"
         ? JSON.stringify(response, null, 2)
@@ -34,6 +36,7 @@ function doPost(e) {
     );
   } catch (error) {
     let errorMessage = `🚨 Error in doPost: ${error.message}`;
+    // Log and send the error message to Slack only once
     logAndSendSlackError(errorMessage);
     return ContentService.createTextOutput(errorMessage).setMimeType(
       ContentService.MimeType.TEXT
@@ -58,6 +61,15 @@ function testDoPost() {
       event: {
         postData: {
           contents: "command=%2Fleave_status&text=LID-1739014881",
+        },
+      },
+    },
+    {
+      description: "✅ Testing `/leave_cancel` with Reason",
+      event: {
+        postData: {
+          contents:
+            "command=%2Fleave_cancel&text=LID-1739772626+Reason+for+cancel+%22Personal+Issue%22",
         },
       },
     },

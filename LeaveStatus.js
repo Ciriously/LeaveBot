@@ -1,62 +1,57 @@
 function getLeaveStatusV2(leaveID) {
   try {
+    // Validate leaveID format using the imported function
+    if (!isValidLeaveID(leaveID)) {
+      return { error: "❌ Error: Invalid leave ID format." };
+    }
+
     // Use cache to store sheet data for a short period (5 minutes)
     let cache = CacheService.getScriptCache();
     let cachedData = cache.get("leave_data");
-
     let data;
-    if (cachedData) {
-      // If cached data is available, parse it
+    let currentTime = new Date().getTime();
+    let cachedTime = cache.get("leave_data_time")
+      ? parseInt(cache.get("leave_data_time"))
+      : 0;
+
+    if (cachedData && currentTime - cachedTime < 300000) {
+      // Use cached data if less than 5 minutes old
+      // Cache is available and fresh, parse it
       data = JSON.parse(cachedData);
     } else {
-      // Open the Google Sheet and get data only from relevant columns
-      let sheet = SpreadsheetApp.openById(
-        "1VgfgmMhsN4e-KlKCvLtX2PxgNk6J7H0CruLu9Vr2J34"
-      ).getSheetByName("Leaves_request");
+      // Open the Google Sheet and get data from columns directly
+      let sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
       if (!sheet) {
         return { error: "❌ Error: 'Leaves_request' sheet not found." };
       }
 
-      data = sheet.getDataRange().getValues(); // Fetch all data
-      if (data.length < 2) {
-        return { error: "❌ Error: No leave requests found." };
+      // Fetch only necessary columns: Request Id (Column A), Team Lead Verdict (Column K), and Reason for Verdict (Column L)
+      let dataRange = sheet.getRange(2, 1, sheet.getLastRow() - 1, 12); // Fetch from Column A to Column L (12 columns)
+      data = dataRange.getValues();
+
+      if (!data || data.length === 0) {
+        return { error: "❌ Error: No valid leave requests found." };
       }
 
-      // Cache the data for 5 minutes to avoid fetching it repeatedly
+      // Cache the data for 5 minutes
       cache.put("leave_data", JSON.stringify(data), 150); // Cache data for 5 minutes
+      cache.put("leave_data_time", currentTime.toString(), 150); // Store timestamp of cached data
     }
 
-    let headers = data[0].map((header) => header.trim().toLowerCase());
+    // Iterate through the cached data to find the leave request by ID
+    for (let i = 0; i < data.length; i++) {
+      let row = data[i];
+      let requestID = row[0]; // Column A (Request Id)
+      let teamLeadVerdict = row[10] || "Pending"; // Column K (Team Lead Verdict)
+      let reasonForVerdict = row[11] || "No reason provided"; // Column L (Reason for Verdict)
 
-    let leaveIDColumn = headers.indexOf("request id");
-    let statusColumn = headers.indexOf("recommendation");
-    let verdictColumn = headers.indexOf("reason for verdict");
-
-    if (leaveIDColumn === -1 || statusColumn === -1) {
-      Logger.log(
-        `❌ Error: Required columns not found. Found headers: ${JSON.stringify(
-          headers
-        )}`
-      );
-      return { error: "❌ Error: Required columns not found in the sheet." };
-    }
-
-    // Search for the leave request
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][leaveIDColumn] === leaveID) {
-        let recommendation = data[i][statusColumn] || "Pending";
-        let reasonForVerdict =
-          verdictColumn !== -1 && data[i][verdictColumn]
-            ? data[i][verdictColumn]
-            : "Not Provided";
-
-        // Construct response with emojis
+      if (requestID === leaveID) {
         let responseMessage =
           `✅ *Leave Status for Request ID: ${leaveID}*\n` +
-          `🔹 *Recommendation:* ${recommendation} ${
-            recommendation === "Approved"
+          `🔹 *Team Lead Verdict:* ${teamLeadVerdict} ${
+            teamLeadVerdict === "Approved"
               ? "✔️"
-              : recommendation === "Rejected"
+              : teamLeadVerdict === "Rejected"
               ? "❌"
               : "⏳"
           }\n` +
@@ -67,7 +62,7 @@ function getLeaveStatusV2(leaveID) {
       }
     }
 
-    return { error: `❌ Error: No leave request found with ID *${leaveID}*` };
+    return { error: `❌ Error: No leave request found with ID ${leaveID}` };
   } catch (error) {
     return { error: `🚨 Error retrieving leave status: ${error.message}` };
   }
@@ -75,7 +70,27 @@ function getLeaveStatusV2(leaveID) {
 
 // ✅ Test function
 function testGetLeaveStatusV2() {
-  let testLeaveID = "LID-1738999057"; // Replace with a real ID from the sheet
+  let testLeaveID = "LID-1739770165"; // Replace with a real ID from the sheet
+  Logger.log("🛠 Testing getLeaveStatusV2 with ID: " + testLeaveID);
+
+  let response = getLeaveStatusV2(testLeaveID);
+
+  Logger.log("📝 Response: " + JSON.stringify(response, null, 2));
+}
+
+// ✅ Test function
+function testGetLeaveStatusV2() {
+  let testLeaveID = "LID-1739770165"; // Replace with a real ID from the sheet
+  Logger.log("🛠 Testing getLeaveStatusV2 with ID: " + testLeaveID);
+
+  let response = getLeaveStatusV2(testLeaveID);
+
+  Logger.log("📝 Response: " + JSON.stringify(response, null, 2));
+}
+
+// ✅ Test function
+function testGetLeaveStatusV2() {
+  let testLeaveID = "LID-1739002554"; // Replace with a real ID from the sheet
   Logger.log("🛠 Testing getLeaveStatusV2 with ID: " + testLeaveID);
 
   let response = getLeaveStatusV2(testLeaveID);

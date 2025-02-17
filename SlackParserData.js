@@ -7,17 +7,26 @@ function parseSlackData(slackCommandData) {
 
   Logger.log("📩 Raw Slack Data: " + slackCommandData);
 
+  // Parse the raw data into an object
   let parsedData = Object.fromEntries(
     slackCommandData
       .split("&")
-      .map((pair) => pair.split("=").map(decodeURIComponent)) // ✅ Decode keys & values
+      .map((pair) => pair.split("=").map(decodeURIComponent)) // Decode keys & values
       .map(([key, value = ""]) => [
         key.trim(),
         value.replace(/\+/g, " ").trim(),
-      ]) // ✅ Trim & replace "+"
+      ]) // Trim & replace "+"
   );
 
   Logger.log("🔍 Parsed Slack Data (Optimized): " + JSON.stringify(parsedData));
+
+  // Ensure both command and text are present and well-formatted
+  if (!parsedData.command || !parsedData.text) {
+    Logger.log("❌ Missing command or text in parsed data.");
+    return {};
+  }
+
+  // Return the parsed data
   return parsedData;
 }
 
